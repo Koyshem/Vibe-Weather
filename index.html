@@ -3,190 +3,439 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>График показателя 12 (Масштаб до 10 баллов)</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <title>Погодное Настроение</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background-color: #f0f2f5; }
-        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h2 { text-align: center; color: #333; margin-bottom: 10px; }
-        p.subtitle { text-align: center; color: #666; margin-bottom: 20px; font-size: 14px; }
-        .calculator { margin-top: 30px; padding: 20px; background: #eef2f5; border-radius: 8px; display: flex; justify-content: center; align-items: center; gap: 15px; }
-        input { padding: 10px; font-size: 16px; width: 150px; border: 1px solid #ccc; border-radius: 4px; }
-        button { padding: 10px 20px; font-size: 16px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; transition: 0.2s; }
-        button:hover { background-color: #0056b3; }
-        #result { font-weight: bold; font-size: 18px; color: #333; min-width: 150px; }
-        canvas { max-height: 550px; }
+        /* --- ВОЗДУШНЫЙ СТИЛЬ И ФОН --- */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            /* Комбинированный фон: линейный градиент неба + радиальный градиент для "солнечного блика" сверху */
+            background: 
+                radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.5) 0%, transparent 60%),
+                linear-gradient(180deg, #89f7fe 0%, #66a6ff 100%);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #333;
+            position: relative;
+        }
+
+        /* --- ДЕКОР: ОБЛАКА --- */
+        .clouds-container {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; /* Чтобы декор не мешал кликам */
+            z-index: 1;
+        }
+        
+        .cloud {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 50%;
+            filter: blur(8px); /* Размытие для мягкости */
+            animation: floatCloud linear infinite;
+        }
+
+        /* Вариации облаков */
+        .c1 { width: 120px; height: 100px; top: 15%; left: -15%; animation-duration: 35s; opacity: 0.8; }
+        .c2 { width: 180px; height: 140px; top: 45%; left: -20%; animation-duration: 55s; animation-delay: -10s; opacity: 0.6; }
+        .c3 { width: 90px; height: 80px; bottom: 20%; left: -10%; animation-duration: 28s; animation-delay: -5s; opacity: 0.9; }
+        .c4 { width: 150px; height: 110px; top: 30%; right: -15%; animation-duration: 45s; animation-direction: reverse; opacity: 0.5; }
+        .c5 { width: 70px; height: 60px; bottom: 10%; right: -5%; animation-duration: 30s; animation-direction: reverse; animation-delay: -15s; opacity: 0.7; }
+
+        @keyframes floatCloud {
+            from { transform: translateX(0); }
+            to { transform: translateX(120vw); } /* Плывут через весь экран */
+        }
+
+        /* --- ДЕКОР: ВОЗДУШНЫЕ ШАРЫ --- */
+        .balloons-container {
+            position: absolute;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .balloon {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            animation: floatUp linear infinite, gentleBob 3s ease-in-out infinite alternate;
+        }
+
+        /* Купол шара */
+        .envelope {
+            width: 60px;
+            height: 75px;
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; /* Форма капли/яйца */
+            box-shadow: inset -5px -5px 10px rgba(0,0,0,0.1);
+            position: relative;
+        }
+        /* Корзина */
+        .basket {
+            width: 16px;
+            height: 12px;
+            background: #8d6e63;
+            border-radius: 3px;
+            margin-top: 2px;
+            position: relative;
+        }
+        /* Веревки (псевдоэлементы) */
+        .basket::before, .basket::after {
+            content: ''; position: absolute; top: -5px; width: 1px; height: 5px; background: #5d4037;
+        }
+        .basket::before { left: 2px; }
+        .basket::after { right: 2px; }
+
+        /* Вариации шаров */
+        .b1 { 
+            left: 15%; bottom: -100px; 
+            animation-duration: 40s; 
+        }
+        .b1 .envelope { background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%); }
+
+        .b2 { 
+            right: 20%; bottom: -150px; scale: 0.7; opacity: 0.8;
+            animation-duration: 55s; animation-delay: -20s;
+        }
+        .b2 .envelope { background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%); }
+
+        .b3 { 
+            left: 55%; bottom: -80px; scale: 0.5; opacity: 0.6;
+            animation-duration: 65s; animation-delay: -5s;
+        }
+        .b3 .envelope { background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%); }
+
+
+        @keyframes floatUp {
+            to { transform: translateY(-130vh) translateX(20vw); } /* Вверх и немного вбок */
+        }
+        @keyframes gentleBob {
+            from { margin-top: 0; }
+            to { margin-top: 8px; } /* Легкое покачивание */
+        }
+
+
+        /* --- ОСНОВНОЙ ИНТЕРФЕЙС --- */
+        #app-container {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(15px); /* Усилили блюр */
+            padding: 40px;
+            border-radius: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+            z-index: 10; /* Интерфейс поверх декора */
+            transition: all 0.5s ease;
+            position: relative;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+
+        h1, h2, p { margin: 0 0 20px 0; color: #445; }
+        h1 { font-size: 2.5rem; }
+        
+        /* Кнопки */
+        button {
+            background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+            border: none;
+            padding: 15px 35px;
+            color: white;
+            font-size: 1.2rem;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(79, 172, 254, 0.3);
+            transition: all 0.3s ease;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+
+        button:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 15px 30px rgba(79, 172, 254, 0.5);
+        }
+
+        button:active {
+            transform: translateY(1px);
+            box-shadow: 0 5px 10px rgba(79, 172, 254, 0.3);
+        }
+
+        /* Анимация появления кнопки */
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.5); }
+            80% { transform: scale(1.1); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .animate-pop { animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+
+        .hidden { display: none; }
+
+        /* Карта */
+        #map-container {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 100; /* Карта поверх всего */
+            background: white;
+            display: none;
+            flex-direction: column;
+            animation: fadeIn 0.5s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        #map { flex-grow: 1; width: 100%; }
+
+        #close-map {
+            position: absolute; top: 20px; right: 20px; z-index: 1001;
+            background: linear-gradient(90deg, #ff758c 0%, #ff7eb3 100%);
+            padding: 10px 25px; font-size: 1rem; box-shadow: 0 5px 15px rgba(255, 117, 140, 0.4);
+        }
+        #close-map:hover { box-shadow: 0 8px 20px rgba(255, 117, 140, 0.6); }
+
+        /* Popup карты */
+        .custom-popup .leaflet-popup-content-wrapper {
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.98);
+            text-align: center;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+            padding: 5px;
+        }
+        .custom-popup .leaflet-popup-tip { background: rgba(255, 255, 255, 0.98); }
+        .popup-emoji { font-size: 3.5rem; display: block; margin-bottom: 10px; text-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .popup-temp { font-weight: 800; font-size: 1.4rem; color: #333; margin-bottom: 5px; }
+        .popup-text { font-size: 0.95rem; color: #666; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h2>График перевода показателя 12 в баллы</h2>
-    <p class="subtitle">Фокус на диапазоне 0–10 баллов (значения >1100 выходят за границы графика)</p>
-    
-    <canvas id="myChart"></canvas>
-
-    <div class="calculator">
-        <input type="number" id="inputValue" placeholder="Введите значение" step="0.01">
-        <button onclick="calcScore()">Рассчитать балл</button>
-        <div id="result"></div>
+    <div class="clouds-container">
+        <div class="cloud c1"></div>
+        <div class="cloud c2"></div>
+        <div class="cloud c3"></div>
+        <div class="cloud c4"></div>
+        <div class="cloud c5"></div>
     </div>
-</div>
 
-<script>
-    // --- 1. Формула расчета ---
-    function calculateScore(x) {
-        let score = 0;
-        if (x < 400) {
-            score = (5 / 400) * x;
-        } else {
-            score = 5 + (x - 400) / 120;
-        }
-        return parseFloat(score.toFixed(2));
-    }
+    <div class="balloons-container">
+        <div class="balloon b1">
+            <div class="envelope"></div>
+            <div class="basket"></div>
+        </div>
+        <div class="balloon b2">
+            <div class="envelope"></div>
+            <div class="basket"></div>
+        </div>
+        <div class="balloon b3">
+            <div class="envelope"></div>
+            <div class="basket"></div>
+        </div>
+    </div>
+    <div id="app-container">
+        <div id="step-1">
+            <h1>Привет! 🌤️</h1>
+            
+            <button onclick="checkWeather()">Как там погода?</button>
+        </div>
 
-    // --- 2. Данные для линии (рисуем чуть дальше границы, чтобы линия не обрывалась) ---
-    const lineData = [];
-    for (let i = 0; i <= 1200; i+=10) {
-        lineData.push({x: i, y: calculateScore(i)});
-    }
+        <div id="step-2" class="hidden">
+            <h2 id="status-title">Анализируем небо...</h2>
+            <p id="funny-message" style="font-size: 1.2rem; min-height: 75px; display: flex; align-items: center; justify-content: center;">...</p>
+            <button id="btn-explore" class="hidden" onclick="showMap()">Посмотрим 🌍</button>
+        </div>
+    </div>
 
-    // --- 3. Ваши точки (фильтруем только те, что влезают в график, или оставляем все - chart.js сам обрежет) ---
-    const userPoints = [
-      
-        {x: 400, y: 5, label: "Порог (5б)"},
- 
-        {x: 760, y: 8, label: "Порог (8б)"},
+    <div id="map-container">
+        <button id="close-map" onclick="closeMap()">Закрыть карту</button>
+        <div id="map"></div>
+    </div>
 
-        {x: 1000, y: 10, label: "Порог (10б)"}
-        // Высокие значения (например 2597) здесь есть в базе, но не отобразятся из-за min/max осей
-    ];
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // --- КОНФИГУРАЦИЯ ---
+        const API_KEY = 'ВАШ_API_КЛЮЧ_ЗДЕСЬ'; // <--- НЕ ЗАБУДЬТЕ ВСТАВИТЬ КЛЮЧ
 
-    // --- 4. Настройка графика ---
-    const ctx = document.getElementById('myChart').getContext('2d');
-    const myChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            datasets: [
-                {
-                    label: 'Функция перевода',
-                    data: lineData,
-                    borderColor: 'blue',
-                    borderWidth: 3,
-                    pointRadius: 0,
-                    fill: false,
-                    tension: 0
-                },
-                {
-                    label: 'Примеры значений',
-                    data: userPoints,
-                    type: 'scatter',
-                    backgroundColor: 'red',
-                    borderColor: 'white',
-                    borderWidth: 2,
-                    pointRadius: 6,
-                    pointHoverRadius: 9
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: {
-                    type: 'linear',
-                    position: 'bottom',
-                    min: 0,
-                    max: 1100, // Ограничиваем ось X чуть дальше 1000
-                    title: { display: true, text: 'Естественный показатель', font: {size: 14} }
-                },
-                y: {
-                    min: 0,
-                    max: 11, // Ограничиваем ось Y до 11 (чтобы 10 было видно комфортно)
-                    title: { display: true, text: 'Баллы', font: {size: 14} },
-                    ticks: { stepSize: 1 }
-                }
-            },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return `Показатель: ${context.parsed.x}, Балл: ${context.parsed.y}`;
-                        }
-                    }
-                },
-                legend: { display: true, position: 'top' },
-                annotation: {
-                    annotations: {
-                        // Зона Неудовлетворительно (0-400)
-                        box1: {
-                            type: 'box', xMin: 0, xMax: 400, yMin: 0, yMax: 11,
-                            backgroundColor: 'rgba(255, 99, 132, 0.1)',
-                            borderWidth: 0,
-                            label: { content: "Неудовл.", position: "start", color: "red", yAdjust: -230 }
-                        },
-                        // Зона Удовлетворительно (400-760)
-                        box2: {
-                            type: 'box', xMin: 400, xMax: 760, yMin: 0, yMax: 11,
-                            backgroundColor: 'rgba(255, 205, 86, 0.15)',
-                            borderWidth: 0,
-                            label: { content: "Удовл.", position: "center", color: "#b38f00", yAdjust: -230 }
-                        },
-                        // Зона Хорошо (760-1000)
-                        box3: {
-                            type: 'box', xMin: 760, xMax: 1000, yMin: 0, yMax: 11,
-                            backgroundColor: 'rgba(75, 192, 192, 0.1)',
-                            borderWidth: 0,
-                            label: { content: "Хорошо", position: "center", color: "green", yAdjust: -230 }
-                        },
-                        // Зона Отлично (1000+)
-                        box4: {
-                            type: 'box', xMin: 1000, xMax: 1100, yMin: 0, yMax: 11,
-                            backgroundColor: 'rgba(153, 102, 255, 0.1)',
-                            borderWidth: 0,
-                            label: { content: "Отл.", position: "start", color: "purple", yAdjust: -230 }
-                        },
-                        // Линии порогов
-                        line5: {
-                            type: 'line', yMin: 5, yMax: 5, borderColor: 'rgba(0,0,0,0.3)', borderDash: [5, 5], borderWidth: 1,
-                            label: { content: "5 баллов", display: true, position: "start", backgroundColor: "gray", font: {size: 10} }
-                        },
-                        line8: {
-                            type: 'line', yMin: 8, yMax: 8, borderColor: 'rgba(0,0,0,0.3)', borderDash: [5, 5], borderWidth: 1,
-                            label: { content: "8 баллов", display: true, position: "start", backgroundColor: "gray", font: {size: 10} }
-                        },
-                        line10: {
-                            type: 'line', yMin: 10, yMax: 10, borderColor: 'rgba(0,0,0,0.3)', borderDash: [5, 5], borderWidth: 1,
-                            label: { content: "10 баллов", display: true, position: "start", backgroundColor: "gray", font: {size: 10} }
-                        }
-                    }
-                }
+        const container = document.getElementById('app-container');
+        const step1 = document.getElementById('step-1');
+        const step2 = document.getElementById('step-2');
+        const funnyMsg = document.getElementById('funny-message');
+        const statusTitle = document.getElementById('status-title');
+        const btnExplore = document.getElementById('btn-explore');
+        let map;
+
+        // --- ЛОГИКА ---
+
+        function checkWeather() {
+            step1.classList.add('hidden');
+            step2.classList.remove('hidden');
+            funnyMsg.innerHTML = "<i>Смотрю на облака...</i> 🧐";
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(successGeo, errorGeo);
+            } else {
+                handleWeatherResult(20, 'Clouds');
             }
         }
-    });
 
-    // --- Функция калькулятора ---
-    function calcScore() {
-        const val = parseFloat(document.getElementById('inputValue').value);
-        const resDiv = document.getElementById('result');
-        
-        if (isNaN(val)) {
-            resDiv.innerHTML = "<span style='color:red'>Введите число</span>";
-            return;
+        function successGeo(position) {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            fetchWeatherData(lat, lon, true);
         }
-        
-        const score = calculateScore(val);
-        let color = score < 5 ? "red" : score < 8 ? "#d4ac0d" : score < 10 ? "green" : "purple";
-        
-        resDiv.innerHTML = `Балл: <span style="color:${color}">${score}</span>`;
-        
-        // Добавляем временную точку на график
-        myChart.data.datasets[1].data.push({x: val, y: score});
-        myChart.update();
-    }
-</script>
 
+        function errorGeo() {
+            alert("Не удалось определить местоположение. Будем считать, что у вас Облачно.");
+            handleWeatherResult(15, 'Clouds');
+        }
+
+        async function fetchWeatherData(lat, lon, isLocalUser = false) {
+            if (API_KEY === 'ВАШ_API_КЛЮЧ_ЗДЕСЬ' || API_KEY === '') {
+                console.warn("API ключ не установлен. Используем имитацию.");
+                const conditions = ['Clear', 'Rain', 'Snow', 'Clouds'];
+                const rndCond = conditions[Math.floor(Math.random() * conditions.length)];
+                const rndTemp = Math.floor(Math.random() * 35) - 5;
+                
+                // Имитируем задержку сети
+                setTimeout(() => {
+                    if (isLocalUser) {
+                        handleWeatherResult(rndTemp, rndCond);
+                    }
+                }, 1000);
+
+                if (!isLocalUser) return { temp: rndTemp, main: rndCond };
+                return;
+            }
+
+            try {
+                const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&lang=ru&appid=${API_KEY}`;
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (isLocalUser) {
+                    handleWeatherResult(data.main.temp, data.weather[0].main);
+                } else {
+                    return { temp: data.main.temp, main: data.weather[0].main };
+                }
+            } catch (error) {
+                console.error(error);
+                if(isLocalUser) handleWeatherResult(15, 'Clouds');
+            }
+        }
+
+        function handleWeatherResult(temp, condition) {
+            let message = "";
+            let title = "";
+
+            if (temp < 0) {
+                title = "Бррр! ❄️";
+                message = "Есть один минус... На улице минус. Посмотрим, кому досталось лето?";
+            } else {
+                switch (condition) {
+                    case 'Clear':
+                        title = "Солнечно! ☀️";
+                        message = "Солнечно и прекрасно. Заглянем, кому сегодня так не повезло?";
+                        break;
+                    case 'Rain':
+                    case 'Drizzle':
+                    case 'Thunderstorm':
+                        title = "Мокро... 🌧️";
+                        message = "Ты под дождём, но, возможно, кто-то щурится от солнца?";
+                        break;
+                    case 'Snow':
+                        title = "Снежно! 🌨️";
+                        message = "Затерялся под сугробами? А у кого-то сейчас цветут деревья...";
+                        break;
+                    case 'Clouds':
+                    default:
+                        title = "Пасмурно ☁️";
+                        message = "Облака перекрыли всё счастье? Узнай у кого его будем отбирать!";
+                        break;
+                }
+            }
+
+            statusTitle.textContent = title;
+            funnyMsg.textContent = message;
+            
+            btnExplore.classList.remove('hidden');
+            btnExplore.classList.add('animate-pop');
+        }
+
+        // --- ЛОГИКА КАРТЫ ---
+
+        function showMap() {
+            document.getElementById('map-container').style.display = 'flex';
+            initMap();
+        }
+
+        function closeMap() {
+            document.getElementById('map-container').style.display = 'none';
+        }
+
+        function initMap() {
+            if (map) {
+                map.invalidateSize(); 
+                return;
+            }
+
+            map = L.map('map', { zoomControl: false }).setView([20, 0], 2);
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap, &copy; CARTO',
+                subdomains: 'abcd',
+                maxZoom: 19
+            }).addTo(map);
+
+            map.on('click', async function(e) {
+                const lat = e.latlng.lat;
+                const lon = e.latlng.lng;
+
+                const popup = L.popup({ className: 'custom-popup' })
+                    .setLatLng(e.latlng)
+                    .setContent('<div style="text-align:center; padding: 10px;">Узнаем погоду... 🤔<br><small>Секундочку</small></div>')
+                    .openOn(map);
+
+                const weather = await fetchWeatherData(lat, lon);
+                
+                let emoji = "🌡️";
+                let text = "";
+
+                if (weather.temp > 30 && weather.main === 'Clear') {
+                    emoji = "🥵☀️"; text = "Адская жара!";
+                } else if (weather.temp > 20 && weather.main === 'Clear') {
+                    emoji = "😎🌞"; text = "Кайф, тепло!";
+                } else if (weather.main === 'Clear') {
+                    emoji = "☀️😊"; text = "Ясно и свежо.";
+                } else if (weather.main.includes('Rain') || weather.main.includes('Drizzle')) {
+                    emoji = "☔🌧️"; text = "Зонтик обязателен.";
+                } else if (weather.main.includes('Thunder')) {
+                    emoji = "⛈️⚡"; text = "Сверкает! Сиди дома.";
+                } else if (weather.main === 'Snow') {
+                    emoji = "☃️❄️"; text = "Время лепить снежки!";
+                } else if (weather.main === 'Clouds') {
+                    emoji = "☁️😐"; text = "Скучная серость.";
+                } else if (weather.main === 'Mist' || weather.main === 'Fog') {
+                    emoji = "🌫️🦔"; text = "Ёжик в тумане.";
+                } else {
+                    emoji = "🌀🤔"; text = "Что-то странное.";
+                }
+
+                const content = `
+                    <div>
+                        <span class="popup-emoji">${emoji}</span>
+                        <div class="popup-temp">${Math.round(weather.temp)}°C</div>
+                        <div class="popup-text">${text}</div>
+                    </div>
+                `;
+
+                popup.setContent(content);
+            });
+        }
+    </script>
 </body>
 </html>
